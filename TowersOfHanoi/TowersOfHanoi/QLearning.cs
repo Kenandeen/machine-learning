@@ -1,15 +1,16 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 
 namespace TowerOfHanoi
 {
     class QLearning
     {
-        private double[,] R;
+        private double[, ,] R;
         private double[,] Q;
 
         private List<string> _States;
-        
+
         public List<string> States
         {
             get
@@ -22,6 +23,7 @@ namespace TowerOfHanoi
         private StateGenerator _Generator;
         private int FinalStateIndex;
         private int _NumberOfDisks;
+        private int _StatesMaxCount;
 
         private List<int> optimalPath = new List<int>();
 
@@ -48,135 +50,130 @@ namespace TowerOfHanoi
                 }
             }
 
-            int dim = Convert.ToInt32(Math.Pow(3, numberOfDisks));
+            _StatesMaxCount = Convert.ToInt32(Math.Pow(3, numberOfDisks));
 
-            Learn(dim);
+            Learn(_StatesMaxCount);
         }
 
-        private void Learn(int dim)
+        private void Learn(int _StatesMaxCount)
         {
-            InitQMatrix(dim);
+            InitQMatrix(_StatesMaxCount);
 
-            InitRMatrix(dim);
+            InitRMatrix(_StatesMaxCount);
 
-            //for (int i = 0; i < dim; i++)
-            //{
-            //    for (int j = 0; j < dim; j++)
-            //        Console.Write(R[i, j].ToString("0.##") + " ");
-            //    Console.WriteLine();
-            //}
+            TrainQMatrix(_StatesMaxCount);
 
-            TrainQMatrix(dim);
+            NormalizeQMatrix(_StatesMaxCount);
 
-            NormalizeQMatrix(dim);
-
-            Test(R, Q, dim);
+            Test(Q, _StatesMaxCount);
         }
 
-        private void InitQMatrix(int dim)
+        private void InitQMatrix(int _StatesMaxCount)
         {
-            Q = new double[dim, dim];
+            Q = new double[_StatesMaxCount, _StatesMaxCount];
         }
 
-        private void InitRMatrix(int dim)
+        private void InitRMatrix(int _StatesMaxCount)
         {
-            R = new double[dim, dim];
+            R = new double[_StatesMaxCount, 3, 2];
 
-            for (int i = 0; i < dim; i++)
+            for (int i = 0; i < _StatesMaxCount; i++)
             {
-                for (int j = 0; j < dim; j++)
-                    R[i, j] = -1;
+                for (int j = 0; j < 3; j++)
+                {
+                    R[i, j, 0] = -1;
+                    R[i, j, 1] = -1;
+                }
             }
 
-            _Generator.StateActionMapping(R, _States, dim, FinalStateIndex);
+            _Generator.StateActionMapping(R, _States, _StatesMaxCount, FinalStateIndex);
         }
 
-        private void TrainQMatrix(int dim)
+        private Dictionary<int, int> pickedActions;
+
+        private void TrainQMatrix(int _StatesMaxCount)
         {
-            // list of available moves (will be based on R matrix which
-            // contains the allowed next moves as 0 values in the array)
-            List<int> availableMoves = new List<int>();
+            pickedActions = new Dictionary<int, int>();
+
+            // list of available actions (will be based on R matrix which
+            // contains the allowed next actions starting from some state as 0 values in the array)
+            List<int> nextActions = new List<int>();
             int nextStep = -1;
 
             int counter = 0;
             int init = -1;
 
-            // dim is the number of all possible states of a puzzle
+            int rIndex = 0;
+            // _StatesMaxCount is the number of all possible states of a puzzle
             // from my experience with this application, 4 times the number
             // of all possible moves has enough episodes to train Q matrix
-            while (counter < 4 * dim)
+            while (counter < 3 * _StatesMaxCount)
             {
-                init = Utility.GetRandomNumber(0, dim);
+                init = Utility.GetRandomNumber(0, _StatesMaxCount);
 
                 do
                 {
                     // get available actions
-                    availableMoves = GetNextActions(dim, init);
+                    nextActions = GetNextActions(_StatesMaxCount, init);
 
                     // Choose any action out of the available actions randomly
-                    nextStep = Utility.GetRandomNumber(0, availableMoves.Count);
-                    nextStep = availableMoves[nextStep];
+                    nextStep = Utility.GetRandomNumber(0, nextActions.Count);
+                    nextStep = nextActions[nextStep];
 
                     // get available actions
-                    availableMoves = GetNextActions(dim, nextStep);
+                    nextActions = GetNextActions(_StatesMaxCount, nextStep);
+
+                    // set the index of the action to take from this state
+                    for (int i = 0; i < 3; i++)
+                    {
+                        if (R[init, i, 1] == nextStep)
+                            rIndex = i;
+                    }
 
                     // this is the value iteration update rule
                     // discount factor is 0.8
-                    Q[init, nextStep] = R[init, nextStep] + 0.8 * Utility.GetMax(Q, nextStep, availableMoves);
+                    Q[init, nextStep] = R[init, rIndex, 0] + 0.8 * Utility.GetMax(Q, nextStep, nextActions);
 
                     // set the next step as the current step
                     init = nextStep;
                 }
-                while (init != dim - 1);
+                while (init != FinalStateIndex);
 
                 counter++;
             }
         }
 
-        private List<int> GetNextActions(int dim, int init)
+        private List<int> GetNextActions(int _StatesMaxCount, int init)
         {
-            List<int> availableMoves = new List<int>();
+            List<int> nextActions = new List<int>();
 
-            for (int i = 0; i < dim; i++)
+            for (int j = 0; j < 3; j++)
             {
                 // if the action i is availabe from the state init
-                if (R[init, i] > -1)
+                if (R[init, j, 1] > -1)
                 {
                     // add it to the available moves list
-                    availableMoves.Add(i);
-
-                    // the maximum number of availabe actions from any state is 3
-                    // so when they reach 3, break to save computation time
-                    if (availableMoves.Count == 3) break;
+                    nextActions.Add(Convert.ToInt32(R[init, j, 1]));
                 }
             }
 
-            return availableMoves;
+            return nextActions;
         }
 
-        private void NormalizeQMatrix(int dim)
+        private void NormalizeQMatrix(int _StatesMaxCount)
         {
-            double maxQ = 0;
+            double maxQ = (from double d in Q select d).Max();
 
-            for (int i = 0; i < dim; i++)
+            for (int i = 0; i < _StatesMaxCount; i++)
             {
-                for (int j = 0; j < dim; j++)
+                for (int j = 0; j < _StatesMaxCount; j++)
                 {
-                    if (Q[i, j] > maxQ)
-                        maxQ = Q[i, j];
-                }
-            }
-
-            for (int i = 0; i < dim; i++)
-            {
-                for (int j = 0; j < dim; j++)
-                {
-                    Q[i, j] = Q[i, j] / maxQ * 100;
+                    Q[i, j] /= maxQ * 100;
                 }
             }
         }
 
-        private void Test(double[,] R, double[,] Q, int dim)
+        private void Test(double[,] Q, int _StatesMaxCount)
         {
             string strStartingState = "";
             int start = 0;
@@ -185,7 +182,7 @@ namespace TowerOfHanoi
             {
                 optimalPath.Clear();
 
-                Console.WriteLine("Enter the starting state in format A#B#C#. For example, the starting state usually is A1-2-3B0C0\n(or type \"new\" to change the number of disks):");
+                Console.WriteLine("Enter the starting state in format A#B#C#. For example, the starting state for 3 disks is A1-2-3B0C0\n(or type \"r\" to reset):");
 
                 string A = "1";
 
@@ -203,10 +200,10 @@ namespace TowerOfHanoi
                     strStartingState = string.Format("A{0}B0C0", A);
                 }
 
-                if (strStartingState.ToLower() == "new")
+                if (strStartingState.ToLower().StartsWith("r"))
                     _Puzzle.Init();
 
-                for (int i = 0; i < dim; i++)
+                for (int i = 0; i < _StatesMaxCount; i++)
                 {
                     if (strStartingState == States[i])
                     {
@@ -215,7 +212,7 @@ namespace TowerOfHanoi
                     }
                 }
 
-                Implement(R, Q, start, dim);
+                FindOptimalAction(Q, start, _StatesMaxCount);
 
                 string strState = "";
 
@@ -225,34 +222,34 @@ namespace TowerOfHanoi
                     strState = States[optimalPath[i]].Replace("A", "A ").Replace("B", "\t\t\tB ").Replace("C", "\t\t\tC ");
                     Console.WriteLine(strState);
                 }
-            } while (start >= 0 && start < dim);
+            } while (start >= 0 && start < _StatesMaxCount);
         }
 
-        private void Implement(double[,] R, double[,] Q, int start, int dim)
+        private void FindOptimalAction(double[,] Q, int start, int _StatesMaxCount)
         {
             optimalPath.Add(start);
 
             if (start == FinalStateIndex) return;
 
-            List<int> availableMoves = GetNextActions(dim, start);
+            List<int> nextActions = GetNextActions(_StatesMaxCount, start);
 
             int maxQindex = 0;
 
-            if (availableMoves.Count > 1)
+            if (nextActions.Count > 1)
             {
-                maxQindex = availableMoves[0];
+                maxQindex = nextActions[0];
 
-                if (Q[start, availableMoves[1]] > Q[start, availableMoves[0]])
-                    maxQindex = availableMoves[1];
+                if (Q[start, nextActions[1]] > Q[start, nextActions[0]])
+                    maxQindex = nextActions[1];
 
-                if (availableMoves.Count > 2)
+                if (nextActions.Count > 2)
                 {
-                    if (Q[start, availableMoves[2]] > Q[start, availableMoves[1]])
-                        maxQindex = availableMoves[2];
+                    if (Q[start, nextActions[2]] > Q[start, nextActions[1]])
+                        maxQindex = nextActions[2];
                 }
             }
 
-            Implement(R, Q, maxQindex, dim);
+            FindOptimalAction(Q, maxQindex, _StatesMaxCount);
         }
     }
 }
