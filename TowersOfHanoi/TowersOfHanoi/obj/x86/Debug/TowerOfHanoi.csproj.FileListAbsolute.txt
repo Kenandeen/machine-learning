@@ -1,0 +1,4 @@
+C:\Users\LordCover\Documents\Data Scientist Goal\Reinforcement Learning\TowersOfHanoi\TowersOfHanoi\obj\x86\Debug\TowersOfHanoi.exe
+C:\Users\LordCover\Documents\Data Scientist Goal\Reinforcement Learning\TowersOfHanoi\TowersOfHanoi\bin\Debug\TowersOfHanoi.exe
+C:\Users\LordCover\Documents\Data Scientist Goal\Reinforcement Learning\TowersOfHanoi\TowersOfHanoi\bin\Debug\TowersOfHanoi.pdb
+C:\Users\LordCover\Documents\Data Scientist Goal\Reinforcement Learning\TowersOfHanoi\TowersOfHanoi\obj\x86\Debug\TowersOfHanoi.pdb
