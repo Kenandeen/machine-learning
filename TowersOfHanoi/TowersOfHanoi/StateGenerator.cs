@@ -11,7 +11,9 @@ namespace TowerOfHanoi
         int bIndex, cIndex;
         List<int> topDisks;
 
-        public StateGenerator() {}
+        private int _StatesMaxCount;
+
+        public StateGenerator() { }
 
         public List<string> GenerateStates(int numberOfDisks)
         {
@@ -25,12 +27,14 @@ namespace TowerOfHanoi
                 A += "-" + a.ToString();
             }
 
+            _StatesMaxCount = Convert.ToInt32(Math.Pow(3, numberOfDisks));
+
             GetNextStates(_States, string.Format("A{0}B0C0", A), true);
 
             return _States;
         }
 
-        public void StateActionMapping(double[,] R, List<string> _States, int dim, int FinalStateIndex)
+        public void StateActionMapping(double[, ,] R, List<string> _States, int dim, int FinalStateIndex)
         {
             Dictionary<int, string> dctStates = new Dictionary<int, string>();
             List<string> nextStepStates = new List<string>();
@@ -50,18 +54,24 @@ namespace TowerOfHanoi
 
                 for (int j = 0; j < nextStepIndeces.Count; j++)
                 {
-                    R[i, nextStepIndeces[j]] = nextStepIndeces[j] == FinalStateIndex ? 100 : 0;
+                    R[i, j, 1] = nextStepIndeces[j];
+                    R[i, j, 0] = nextStepIndeces[j] == FinalStateIndex ? 100 : 0;
                 }
 
                 nextStepStates.Clear();
                 nextStepIndeces.Clear();
             }
 
-            R[FinalStateIndex, FinalStateIndex] = 100;
+            R[FinalStateIndex, 2, 1] = FinalStateIndex;
+            R[FinalStateIndex, 2, 0] = 100;
         }
 
         private void GetNextStates(List<string> States, string state, bool recursive)
         {
+            // Once all possible states are added, quit recursion (this will save us some time)
+            if (States.Count == _StatesMaxCount)
+                return;
+
             List<string> availableMoves = new List<string>();
 
             topDisks.Clear();
